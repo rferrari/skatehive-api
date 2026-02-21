@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { validateApiKey, checkRateLimit } from '@/app/utils/apiAuth';
-import HiveClient from '@/lib/hive/hiveclient';
+import { HiveClient } from '@/lib/hive-client';
 import { PrivateKey } from '@hiveio/dhive';
 
 interface ComposeBlogRequest {

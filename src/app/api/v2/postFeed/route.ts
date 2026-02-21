@@ -8,9 +8,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { validateApiKey, checkRateLimit } from '@/app/utils/apiAuth';
-import HiveClient from '@/lib/hive/hiveclient';
+import { HiveClient } from '@/lib/hive-client';
 import { PrivateKey } from '@hiveio/dhive';
-import { HIVE_CONFIG } from '@/config/app.config';
+
+// Skatehive constants
+const COMMUNITY_TAG = 'hive-173115';
+const THREAD_AUTHOR = process.env.NEXT_PUBLIC_SKATEHIVE_THREAD_AUTHOR || 'skatehivethread';
+const THREAD_PERMLINK = process.env.NEXT_PUBLIC_SKATEHIVE_THREAD_PERMLINK || 'nxvsjarvmp';
 
 interface PostFeedRequest {
   author: string; // Required: Hive username
@@ -33,7 +37,7 @@ async function getLatestSnapContainer(): Promise<string> {
     
     // Check if today's container exists
     const content = await HiveClient.database.call('get_content', [
-      HIVE_CONFIG.THREADS.AUTHOR,
+      THREAD_AUTHOR,
       expectedPermlink
     ]);
     
@@ -42,10 +46,10 @@ async function getLatestSnapContainer(): Promise<string> {
     }
     
     // Fallback to main thread
-    return HIVE_CONFIG.THREADS.PERMLINK;
+    return THREAD_PERMLINK;
   } catch (error) {
     console.error('Error getting snap container:', error);
-    return HIVE_CONFIG.THREADS.PERMLINK;
+    return THREAD_PERMLINK;
   }
 }
 
@@ -143,7 +147,7 @@ export async function POST(request: NextRequest) {
   }
   
   // 4. Get parent permlink (latest snap container)
-  const parentAuthor = data.parent_author || HIVE_CONFIG.THREADS.AUTHOR;
+  const parentAuthor = data.parent_author || THREAD_AUTHOR;
   const parentPermlink = data.parent_permlink || await getLatestSnapContainer();
   
   // 5. Generate permlink
@@ -152,7 +156,7 @@ export async function POST(request: NextRequest) {
   // 6. Extract hashtags from body
   const hashtags = extractHashtags(data.body);
   const tags = [
-    HIVE_CONFIG.COMMUNITY_TAG,
+    COMMUNITY_TAG,
     parentPermlink,
     ...hashtags
   ];
