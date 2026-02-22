@@ -13,7 +13,7 @@ import { PrivateKey } from '@hiveio/dhive';
 
 // Skatehive constants
 const COMMUNITY_TAG = 'hive-173115';
-const THREAD_AUTHOR = process.env.NEXT_PUBLIC_SKATEHIVE_THREAD_AUTHOR || 'skatehivethread';
+const THREAD_AUTHOR = process.env.NEXT_PUBLIC_SKATEHIVE_THREAD_AUTHOR || 'peak.snaps';
 const THREAD_PERMLINK = process.env.NEXT_PUBLIC_SKATEHIVE_THREAD_PERMLINK || 'nxvsjarvmp';
 
 interface PostFeedRequest {
@@ -27,28 +27,32 @@ interface PostFeedRequest {
 }
 
 /**
- * Get latest snap container permlink
+ * Get latest snap container permlink from @peak.snaps
+ * Uses get_discussions_by_author_before_date to find the most recent container
+ * Same implementation as skatehive3.0 client-functions.ts
  */
 async function getLatestSnapContainer(): Promise<string> {
   try {
-    const today = new Date();
-    const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
-    const expectedPermlink = `snap-container-${dateStr}`;
-    
-    // Check if today's container exists
-    const content = await HiveClient.database.call('get_content', [
-      THREAD_AUTHOR,
-      expectedPermlink
-    ]);
-    
-    if (content && content.id > 0) {
-      return expectedPermlink;
+    const author = THREAD_AUTHOR;
+    const beforeDate = new Date().toISOString().split('.')[0]; // Remove milliseconds
+    const permlink = '';
+    const limit = 1;
+
+    const result = await HiveClient.database.call(
+      'get_discussions_by_author_before_date',
+      [author, permlink, beforeDate, limit]
+    );
+
+    if (result && result.length > 0 && result[0].permlink) {
+      console.log('✅ Found snap container:', result[0].permlink, 'from', author);
+      return result[0].permlink;
     }
     
-    // Fallback to main thread
+    // Fallback to main thread if no container found
+    console.warn('⚠️ No snap container found, using fallback:', THREAD_PERMLINK);
     return THREAD_PERMLINK;
   } catch (error) {
-    console.error('Error getting snap container:', error);
+    console.error('❌ Error getting snap container:', error);
     return THREAD_PERMLINK;
   }
 }

@@ -108,10 +108,12 @@ Create a snap/short post in the Skatehive feed (like a tweet).
   body: string;               // Required
   images?: string[];          // Optional (IPFS or regular URLs)
   video_url?: string;         // Optional (IPFS hash or 3Speak URL)
-  parent_author?: string;     // Optional (default: thread author)
-  parent_permlink?: string;   // Optional (default: latest snap-container)
+  parent_author?: string;     // Optional (default: 'peak.snaps')
+  parent_permlink?: string;   // Optional (default: auto-detect latest snap-container)
 }
 ```
+
+**Note:** The API automatically detects the latest snap container from `@peak.snaps` if no `parent_permlink` is provided.
 
 **Example Request:**
 
@@ -142,6 +144,46 @@ curl -X POST https://api.skatehive.app/api/v2/postFeed \
     "url": "https://skatehive.app/post/yourhiveusername/550e8400-e29b-41d4-a716-446655440000",
     "hive_url": "https://peakd.com/@yourhiveusername/550e8400-e29b-41d4-a716-446655440000",
     "transaction_id": "def456..."
+  }
+}
+```
+
+---
+
+### 3. GET `/api/v2/posting-status`
+
+Check posting endpoints configuration and health status (no authentication required).
+
+**Example Request:**
+
+```bash
+curl -X GET https://api.skatehive.app/api/v2/posting-status
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "status": "operational",
+  "config": {
+    "community_tag": "hive-173115",
+    "parent_author": "peak.snaps",
+    "parent_author_exists": true,
+    "fallback_permlink": "nxvsjarvmp",
+    "latest_snap_container": "snap-container-1771683120"
+  },
+  "endpoints": {
+    "composeBlog": {
+      "path": "/api/v2/composeBlog",
+      "method": "POST",
+      "rate_limit": "20 requests/minute"
+    },
+    "postFeed": {
+      "path": "/api/v2/postFeed",
+      "method": "POST",
+      "rate_limit": "50 requests/minute"
+    }
   }
 }
 ```
