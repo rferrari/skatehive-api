@@ -25,6 +25,12 @@ export interface FeedPostResult {
   txId: string;
 }
 
+export interface FeedDeleteResult {
+  author: string;
+  permlink: string;
+  txId: string;
+}
+
 export function extractHashtags(text: string): string[] {
   const hashtagRegex = /#(\w+)/g;
   const matches = text.match(hashtagRegex) || [];
@@ -136,6 +142,30 @@ export async function postFeedAsAlias(alias: PostingAlias, input: FeedPostInput)
     permlink,
     parentAuthor,
     parentPermlink,
+    txId: result.id,
+  };
+}
+
+export async function deleteFeedPostAsAlias(
+  alias: PostingAlias,
+  payload: { author: string; permlink: string }
+): Promise<FeedDeleteResult> {
+  const { postingKey } = resolvePostingAccount(alias);
+
+  const deleteOp: any = [
+    'delete_comment',
+    {
+      author: payload.author,
+      permlink: payload.permlink,
+    },
+  ];
+
+  const privateKey = PrivateKey.fromString(postingKey);
+  const result = await HiveClient.broadcast.sendOperations([deleteOp], privateKey);
+
+  return {
+    author: payload.author,
+    permlink: payload.permlink,
     txId: result.id,
   };
 }
