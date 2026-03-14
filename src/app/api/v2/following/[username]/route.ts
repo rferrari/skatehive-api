@@ -11,17 +11,20 @@ export async function GET(
     try {
         const { username } = await params;
 
+        // Parse optional offset parameter for pagination
+        const searchParams = request.nextUrl.searchParams;
+        const offsetParam = searchParams.get('offset');
+        const offset = offsetParam ? parseInt(offsetParam, 10) : 0;
+        const validOffset = isNaN(offset) || offset < 0 ? 0 : offset;
 
-        // Get account information
+        // Get global following list for the user
         const {rows, headers} = await db.executeQuery(`
 SELECT
-cs.account_name, cs.community_name, 
 f.follower_name, f.following_name
 FROM follows f
-JOIN community_subs cs ON f.following_name = cs.account_name 
 WHERE 
-f.follower_name = '${username}' AND
-cs.community_name = 'hive-173115';
+f.follower_name = '${username}'
+LIMIT 1000 OFFSET ${validOffset};
     `);
 
         if (!rows || rows.length === 0) {

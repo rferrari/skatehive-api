@@ -9,17 +9,20 @@ export async function GET(
   console.log("Fetching followers data...");
   try {
     const { username } = await params;
+        // Parse optional offset parameter for pagination
+        const searchParams = request.nextUrl.searchParams;
+        const offsetParam = searchParams.get('offset');
+        const offset = offsetParam ? parseInt(offsetParam, 10) : 0;
+        const validOffset = isNaN(offset) || offset < 0 ? 0 : offset;
 
-        // Get account information
+        // Get global followers list for the user
         const {rows, headers} = await db.executeQuery(`
 SELECT
-cs.account_name, cs.community_name, 
 f.follower_name, f.following_name
 FROM follows f
-JOIN community_subs cs ON f.follower_name = cs.account_name 
 WHERE 
-f.following_name = '${username}' AND
-cs.community_name = 'hive-173115';
+f.following_name = '${username}'
+LIMIT 1000 OFFSET ${validOffset};
     `);
 
         if (!rows || rows.length === 0) {
