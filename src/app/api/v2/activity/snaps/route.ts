@@ -14,8 +14,7 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, Number(searchParams.get('page')) || DEFAULT_PAGE);
     const limit = Math.max(1, Number(searchParams.get('limit')) || DEFAULT_LIMIT);
 
-    const {rows, headers} = await fetchCommunitySnaps(COMMUNITY, page, limit);
-    const total = rows.length;
+    const { rows, headers, total } = await fetchCommunitySnaps(COMMUNITY, page, limit);
 
     return NextResponse.json(
       {

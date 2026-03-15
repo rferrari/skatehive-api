@@ -24,13 +24,13 @@ export async function GET(
 
         // Get total count for pagination
         const { rows: totalRows } = await db.executeQuery(`
-SELECT COUNT(*) AS total
-FROM comments c
-WHERE c.author = '${username}'
-AND c.parent_permlink SIMILAR TO 'snap-container-%'
-AND c.json_metadata @> '{"tags": ["hive-173115"]}'
-AND c.deleted = false;
-      `);
+          SELECT COUNT(*) AS total
+          FROM comments c
+          WHERE c.author = @username
+          AND c.parent_permlink SIMILAR TO 'snap-container-%'
+          AND c.json_metadata @> '{"tags": ["hive-173115"]}'
+          AND c.deleted = false;
+        `, [{ name: 'username', value: username }]);
 
         const total = parseInt(totalRows[0].total);
 
@@ -91,7 +91,7 @@ LEFT JOIN accounts a ON c.author = a.name
 LEFT JOIN operation_effective_comment_vote_view v 
     ON c.author = v.author 
     AND c.permlink = v.permlink
-WHERE c.author = '${username}'
+WHERE c.author = @username
 AND c.parent_permlink SIMILAR TO 'snap-container-%'
 AND c.json_metadata @> '{"tags": ["hive-173115"]}'
 AND c.deleted = false
@@ -133,7 +133,7 @@ GROUP BY
 ORDER BY c.created DESC
 LIMIT ${limit}
 OFFSET ${offset};
-`);
+`, [{ name: 'username', value: username }]);
 
         // Calculate pagination metadata
         const totalPages = Math.ceil(total / limit);

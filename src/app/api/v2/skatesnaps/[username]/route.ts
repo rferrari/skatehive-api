@@ -12,13 +12,12 @@ const DEFAULT_FEED_LIMIT = Number(process.env.DEFAULT_FEED_LIMIT) || 25;
 
 export async function GET(
     request: NextRequest,
+    { params }: { params: Promise<{ username: string }> }
 ) {
     console.log("Fetching USER FEED data...");
     try {
-        // Get pagination parameters from URL
+        const { username } = await params;
         const { searchParams } = new URL(request.url);
-        const username = searchParams.get('username');
-
 
         // Get pagination parameters from URL
         const page = Math.max(1, Number(searchParams.get('page')) || Number(DEFAULT_PAGE));
@@ -27,13 +26,13 @@ export async function GET(
 
         // Get total count for pagination
         const {rows: totalRows} = await db.executeQuery(`
-SELECT COUNT(*) AS total
-FROM comments c
-WHERE c.author = '${username}'
-AND c.parent_permlink SIMILAR TO 'snap-container-%'
-AND c.json_metadata @> '{"tags": ["hive-173115"]}'
-AND c.deleted = false;
-      `);
+          SELECT COUNT(*) AS total
+          FROM comments c
+          WHERE c.author = @username
+          AND c.parent_permlink SIMILAR TO 'snap-container-%'
+          AND c.json_metadata @> '{"tags": ["hive-173115"]}'
+          AND c.deleted = false;
+        `, [{ name: 'username', value: username }]);
 
         const total = parseInt(totalRows[0].total);
 
@@ -94,7 +93,7 @@ LEFT JOIN accounts a ON c.author = a.name
 LEFT JOIN operation_effective_comment_vote_view v 
     ON c.author = v.author 
     AND c.permlink = v.permlink
-WHERE c.author = '${username}'
+WHERE c.author = @username
 AND c.parent_permlink SIMILAR TO 'snap-container-%'
 AND c.json_metadata @> '{"tags": ["hive-173115"]}'
 AND c.deleted = false
@@ -136,7 +135,7 @@ GROUP BY
 ORDER BY c.created DESC
 LIMIT ${limit}
 OFFSET ${offset};
-`);
+`, [{ name: 'username', value: username }]);
 
         // Calculate pagination metadata
         const totalPages = Math.ceil(total / limit);

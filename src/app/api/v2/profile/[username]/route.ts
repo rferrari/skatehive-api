@@ -38,8 +38,8 @@ export async function GET(
         a.proxy,
         a.last_update
       FROM accounts a
-      WHERE a.name = '${resolvedUsername}'
-    `);
+      WHERE a.name = @username
+    `, [{ name: 'username', value: resolvedUsername }]);
 
     if (!rows || rows.length === 0) {
       return NextResponse.json(
@@ -55,32 +55,31 @@ export async function GET(
     const { rows: totalPostsRows } = await db.executeQuery(`
       SELECT COUNT(*) AS total
       FROM comments c
-      WHERE c.author = '${resolvedUsername}'
+      WHERE c.author = @username
       AND c.parent_permlink SIMILAR TO 'snap-container-%'
       AND c.json_metadata @> '{"tags": ["hive-173115"]}'
       AND c.deleted = false;
-          `);
-    // console.dir(totalPostsRows);
+    `, [{ name: 'username', value: resolvedUsername }]);
 
     // Get following? information
     const { rows: rowsFollowing } = await db.executeQuery(`
-SELECT Count(f.following_name) 
-FROM follows f
-JOIN community_subs cs ON f.following_name = cs.account_name 
-WHERE 
-f.follower_name = '${resolvedUsername}' AND
-cs.community_name = 'hive-173115';
-          `);
+      SELECT Count(f.following_name) 
+      FROM follows f
+      JOIN community_subs cs ON f.following_name = cs.account_name 
+      WHERE 
+      f.follower_name = @username AND
+      cs.community_name = 'hive-173115';
+    `, [{ name: 'username', value: resolvedUsername }]);
 
     // Get followers? information
     const { rows: rowsFollowers } = await db.executeQuery(`
-SELECT Count(f.follower_name) 
-FROM follows f
-JOIN community_subs cs ON f.follower_name = cs.account_name 
-WHERE 
-f.following_name = '${resolvedUsername}' AND
-cs.community_name = 'hive-173115';
-      `);
+      SELECT Count(f.follower_name) 
+      FROM follows f
+      JOIN community_subs cs ON f.follower_name = cs.account_name 
+      WHERE 
+      f.following_name = @username AND
+      cs.community_name = 'hive-173115';
+    `, [{ name: 'username', value: resolvedUsername }]);
 
 
     const hiverc = await HiveClient.rc.getRCMana(resolvedUsername);

@@ -14,7 +14,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { checkApiKey } from '@/app/utils/apiAuth';
+import { validateApiKey, checkRateLimit } from '@/app/utils/apiAuth';
 
 // Configuration
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
@@ -110,14 +110,36 @@ async function uploadToPinata(
 export async function POST(request: NextRequest) {
   try {
     // 1. Check API key
-    const authResult = checkApiKey(request);
-    if (!authResult.authorized) {
+    const authResult = validateApiKey(request);
+    if (!authResult.isValid) {
       return NextResponse.json(
         { 
           error: 'Unauthorized', 
-          message: 'Valid API key required. Include as Bearer token in Authorization header.' 
+          message: authResult.error || 'Valid API key required. Include as Bearer token in Authorization header.' 
         },
         { status: 401 }
+      );
+    }
+
+    // 2. Rate limiting (100 per hour as per documentation)
+    // 100/hour = ~1.6/min. Window is 1 hour = 3600000ms
+    const apiKey = request.headers.get('authorization') || '';
+    const rateLimit = checkRateLimit(apiKey, 100, 3600000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Rate limit exceeded',
+          message: 'IPFS upload rate limit exceeded (100/hour)',
+          resetAt: new Date(rateLimit.resetAt).toISOString()
+        },
+        { 
+          status: 429,
+          headers: {
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': rateLimit.resetAt.toString()
+          }
+        }
       );
     }
 
@@ -134,7 +156,7 @@ export async function POST(request: NextRequest) {
     // 3. Parse form data
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
-    const creator = (formData.get('creator') as string) || authResult.keyName || 'api-upload';
+    const creator = (formData.get('creator') as string) || authResult.apiKeyName || 'api-upload';
 
     if (!file) {
       return NextResponse.json(

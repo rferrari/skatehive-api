@@ -11,6 +11,26 @@ export async function fetchCommunitySnaps(COMMUNITY: string, page: number, limit
   const TAG_FILTER = `"tags": ["${COMMUNITY}"]`;
   const offset = (page - 1) * limit;
 
+  // Get total count first to fix pagination
+  const countQuery = `
+      SELECT COUNT(DISTINCT c.author) as total
+      FROM comments c
+      WHERE c.author IN (
+        SELECT account_name FROM hafsql.community_subs WHERE community_name = @community
+      )
+      AND c.deleted = false
+      AND c.parent_permlink SIMILAR TO 'snap-container-%'
+      AND c.json_metadata @> @tagFilter
+      AND c.created >= date_trunc('week', NOW())
+      AND c.created < date_trunc('week', NOW()) + interval '7 days';
+  `;
+
+  const { rows: countRows } = await db.executeQuery(countQuery, [
+    { name: 'community', value: COMMUNITY },
+    { name: 'tagFilter', value: `{${TAG_FILTER}}` }
+  ]);
+  const total = parseInt(countRows[0]?.total || '0');
+
   const query = `
       SELECT 
         c.author AS user,
@@ -35,11 +55,11 @@ export async function fetchCommunitySnaps(COMMUNITY: string, page: number, limit
         TO_CHAR(NOW(), 'IYYY-IW') AS current_week
       FROM comments c
       WHERE c.author IN (
-        SELECT account_name FROM hafsql.community_subs WHERE community_name = '${COMMUNITY}'
+        SELECT account_name FROM hafsql.community_subs WHERE community_name = @community
       )
       AND c.deleted = false
       AND c.parent_permlink SIMILAR TO 'snap-container-%'
-      AND c.json_metadata @> '{${TAG_FILTER}}'
+      AND c.json_metadata @> @tagFilter
       AND c.created >= date_trunc('week', NOW())
       AND c.created < date_trunc('week', NOW()) + interval '7 days'
       GROUP BY c.author
@@ -48,12 +68,10 @@ export async function fetchCommunitySnaps(COMMUNITY: string, page: number, limit
       OFFSET ${offset};
     `;
 
-  // const [rows, headers] = await db.executeQuery(query);
+  const { rows, headers } = await db.executeQuery(query, [
+    { name: 'community', value: COMMUNITY },
+    { name: 'tagFilter', value: `{${TAG_FILTER}}` }
+  ]);
 
-  const { rows, headers } = await db.executeQuery(query);
-
-    return {
-        rows,
-        headers,
-    };
+  return { rows, headers, total };
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { CommentOperation, PrivateKey } from '@hiveio/dhive';
 import { HiveClient } from '@/lib/hive-client';
 import { HAFSQL_Database } from '@/lib/hafsql_database';
+import { validateApiKey, checkRateLimit } from '@/app/utils/apiAuth';
 
 const DEBUG = true;
 const db = new HAFSQL_Database();
@@ -12,6 +13,31 @@ function new_permlink() {
 
 export async function POST(request: NextRequest) {
   if (DEBUG) console.log('Received POST request');
+
+  // 1. Validate API key
+  const authResult = validateApiKey(request);
+  if (!authResult.isValid) {
+    return NextResponse.json({ success: false, error: authResult.error }, { status: 401 });
+  }
+
+  // 2. Rate limiting
+  const rateLimit = checkRateLimit(request.headers.get('authorization') || '', 10, 60000);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Rate limit exceeded',
+        resetAt: new Date(rateLimit.resetAt).toISOString()
+      },
+      { 
+        status: 429,
+        headers: {
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': rateLimit.resetAt.toString()
+        }
+      }
+    );
+  }
 
   const postingKey = request.headers.get('Authorization')?.replace("Bearer ", "");
   if (!postingKey) return NextResponse.json({ error: 'Missing posting key in headers' }, { status: 400 });

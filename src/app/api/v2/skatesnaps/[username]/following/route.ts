@@ -11,13 +11,13 @@ const DEFAULT_FEED_LIMIT = Number(process.env.DEFAULT_FEED_LIMIT) || 25;
 
 export async function GET(
     request: NextRequest,
+    { params }: { params: Promise<{ username: string }> }
 ) {
 
     console.log("Fetching USER FOLLOWING SkateSnaps data...");
     try {
-        // Get pagination parameters from URL
+        const { username } = await params;
         const { searchParams } = new URL(request.url);
-        const username = searchParams.get('username');
         
         const page = Math.max(1, Number(searchParams.get('page')) || Number(DEFAULT_PAGE));
         const limit = Math.max(1, Number(searchParams.get('limit')) || Number(DEFAULT_FEED_LIMIT));
@@ -25,20 +25,20 @@ export async function GET(
 
         // Get total count for pagination
         const {rows: totalRows} = await db.executeQuery(`
-       SELECT 
-    COUNT(*) AS total
-FROM comments c
-JOIN follows f ON c.author = f.following_name
-JOIN community_subs cs ON f.following_name = cs.account_name 
-WHERE 
-    f.follower_name = '${username}'
-    AND cs.community_name = 'hive-173115'
-    AND (
-        (c.parent_permlink SIMILAR TO 'snap-container-%' AND c.json_metadata @> '{"tags": ["hive-173115"]}')
-        OR c.parent_permlink = 'nxvsjarvmp'
-    )
-    AND c.deleted = false
-    `);
+          SELECT 
+            COUNT(*) AS total
+          FROM comments c
+          JOIN follows f ON c.author = f.following_name
+          JOIN community_subs cs ON f.following_name = cs.account_name 
+          WHERE 
+            f.follower_name = @username
+            AND cs.community_name = 'hive-173115'
+            AND (
+                (c.parent_permlink SIMILAR TO 'snap-container-%' AND c.json_metadata @> '{"tags": ["hive-173115"]}')
+                OR c.parent_permlink = 'nxvsjarvmp'
+            )
+            AND c.deleted = false
+        `, [{ name: 'username', value: username }]);
 
         const total = parseInt(totalRows[0].total);
 
@@ -101,7 +101,7 @@ WHERE
         LEFT JOIN operation_effective_comment_vote_view v 
             ON c.author = v.author 
             AND c.permlink = v.permlink
-        WHERE f.follower_name = '${username}'
+        WHERE f.follower_name = @username
         AND cs.community_name = 'hive-173115'
         AND c.parent_permlink SIMILAR TO 'snap-container-%'
         AND c.json_metadata @> '{"tags": ["hive-173115"]}'
@@ -144,7 +144,7 @@ WHERE
         ORDER BY c.created DESC
         LIMIT ${limit}
         OFFSET ${offset};
-    `);
+    `, [{ name: 'username', value: username }]);
 
         // Calculate pagination metadata
         const totalPages = Math.ceil(total / limit);
