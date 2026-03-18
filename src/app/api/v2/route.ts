@@ -4,7 +4,7 @@ export async function GET() {
     return NextResponse.json(
         {
             success: true,
-            message: "Welcome to the API v1",
+            message: "Welcome to the API v2",
             endpoints: {
                 leaderboard:    "/api/v2/leaderboard",
                 feed_main:      "/api/v2/feed",

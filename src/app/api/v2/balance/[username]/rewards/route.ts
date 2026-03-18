@@ -5,11 +5,11 @@ const db = new HAFSQL_Database();
 
 export async function GET(
     request: NextRequest,
+    { params }: { params: Promise<{ username: string }> }
 ) {
   console.log("Fetching BALANCEC REWARDS data...");
   try {
-    const { searchParams } = new URL(request.url);
-    const username = searchParams.get('username');
+    const { username } = await params;
 
     // Get pending rewards information with detailed payout calculations
     const {rows} = await db.executeQuery(`
@@ -33,11 +33,11 @@ export async function GET(
         SUM(CAST(curator_payout_value AS DOUBLE PRECISION)) as total_curator_payouts,
         SUM(CAST(beneficiary_payout_value AS DOUBLE PRECISION)) as total_beneficiary_payouts
       FROM comments c
-      WHERE c.author = '${username}'
+      WHERE c.author = @username
       AND c.cashout_time > NOW()
       AND c.pending_payout_value > 0
       AND c.deleted = false
-    `);
+    `, [{ name: 'username', value: username }]);
 
     // Get detailed list of pending posts
     const {rows: pendingPosts} = await db.executeQuery(`
@@ -63,12 +63,12 @@ export async function GET(
         c.allow_votes,
         c.allow_curation_rewards
       FROM comments c
-      WHERE c.author = '${username}'
+      WHERE c.author = @username
       AND c.pending_payout_value > 0
       AND c.cashout_time > NOW()
       AND c.deleted = false
       ORDER BY c.pending_payout_value DESC
-    `);
+    `, [{ name: 'username', value: username }]);
 
     return NextResponse.json(
       {

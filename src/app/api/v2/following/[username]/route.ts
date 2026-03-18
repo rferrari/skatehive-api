@@ -19,13 +19,15 @@ export async function GET(
 
         // Get global following list for the user
         const {rows, headers} = await db.executeQuery(`
-SELECT
-f.follower_name, f.following_name
-FROM follows f
-WHERE 
-f.follower_name = '${username}'
-LIMIT 1000 OFFSET ${validOffset};
-    `);
+          SELECT
+            f.follower_name, f.following_name
+          FROM follows f
+          WHERE f.follower_name = @username
+          LIMIT 1000 OFFSET @offset;
+        `, [
+          { name: 'username', value: username },
+          { name: 'offset', value: validOffset }
+        ]);
 
         if (!rows || rows.length === 0) {
             return NextResponse.json(

@@ -11,13 +11,13 @@ const DEFAULT_FEED_LIMIT = Number(process.env.DEFAULT_FEED_LIMIT) || 25;
 
 export async function GET(
     request: NextRequest,
+    { params }: { params: Promise<{ username: string }> }
 ) {
     console.log("Fetching USER FOLLOWING FEED data...");
     try {
+        const { username } = await params;
         const { searchParams } = new URL(request.url);
-        const username = searchParams.get('username');
-        // Get pagination parameters from URL
-        // const { searchParams } = new URL(request.url);
+
         const page = Math.max(1, Number(searchParams.get('page')) || Number(DEFAULT_PAGE));
         const limit = Math.max(1, Number(searchParams.get('limit')) || Number(DEFAULT_FEED_LIMIT));
         const offset = (page - 1) * limit;
@@ -29,11 +29,12 @@ export async function GET(
         FROM comments c
         JOIN follows f ON c.author = f.following_name
         JOIN community_subs cs ON f.following_name = cs.account_name 
-        WHERE f.follower_name = '${username}'
+        WHERE f.follower_name = @username
             AND cs.community_name = 'hive-173115'
             AND c.parent_permlink SIMILAR TO 'snap-container-%'
             AND c.json_metadata @> '{"tags": ["hive-173115"]}'
-            AND c.deleted = false;`
+            AND c.deleted = false;`,
+        [{ name: 'username', value: username }]
         );
 
         const total = parseInt(totalRows[0].total);
@@ -97,7 +98,7 @@ export async function GET(
         LEFT JOIN operation_effective_comment_vote_view v 
             ON c.author = v.author 
             AND c.permlink = v.permlink
-        WHERE f.follower_name = '${username}'
+        WHERE f.follower_name = @username
         AND cs.community_name = 'hive-173115'
         AND c.parent_permlink SIMILAR TO 'snap-container-%'
         AND c.json_metadata @> '{"tags": ["hive-173115"]}'
@@ -140,7 +141,7 @@ export async function GET(
         ORDER BY c.created DESC
         LIMIT ${limit}
         OFFSET ${offset};
-    `);
+    `, [{ name: 'username', value: username }]);
 
         // Calculate pagination metadata
         const totalPages = Math.ceil(total / limit);

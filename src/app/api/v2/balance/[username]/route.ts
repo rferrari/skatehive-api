@@ -5,11 +5,11 @@ const db = new HAFSQL_Database();
 
 export async function GET(
   request: NextRequest,
+  { params }: { params: Promise<{ username: string }> }
 ) {
   console.log("Fetching BALANCE data...");
   try {
-    const { searchParams } = new URL(request.url);
-    const username = searchParams.get('username');
+    const { username } = await params;
 
     // Get user's balance + delegation information
     const {rows, headers} = await db.executeQuery(`
@@ -25,8 +25,8 @@ export async function GET(
         COALESCE(a.incoming_hp, '0') AS received_hp
       FROM balances b
       LEFT JOIN accounts a ON b.account_name = a.name
-      WHERE b.account_name = '${username}'
-    `);
+      WHERE b.account_name = @username
+    `, [{ name: 'username', value: username }]);
 
     if (!rows || rows.length === 0) {
       return NextResponse.json(
