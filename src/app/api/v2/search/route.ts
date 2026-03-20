@@ -39,8 +39,8 @@ export async function GET(request: NextRequest) {
   try {
     let users: any[] = [];
     let snaps: any[] = [];
-    let totalUsers = 0;
-    let totalSnaps = 0;
+    let hasMoreUsers = false;
+    let hasMoreSnaps = false;
 
     // Search Users
     if (type === 'all' || type === 'users') {
@@ -60,18 +60,12 @@ export async function GET(request: NextRequest) {
             LIMIT @limit OFFSET @offset
         `, [
             { name: 'query', value: searchQuery },
-            { name: 'limit', value: limit },
+            { name: 'limit', value: limit + 1 },
             { name: 'offset', value: offset }
         ]);
-        users = userRows;
-
-        const { rows: userCountRows } = await db.executeQuery(`
-            SELECT COUNT(*) as total
-            FROM accounts
-            WHERE name ILIKE @query
-               OR (json_metadata::jsonb->'profile'->>'name') ILIKE @query
-        `, [{ name: 'query', value: searchQuery }]);
-        totalUsers = parseInt(userCountRows[0].total);
+        
+        hasMoreUsers = userRows.length > limit;
+        users = userRows.slice(0, limit);
     }
 
     // Search Snaps
@@ -104,31 +98,16 @@ export async function GET(request: NextRequest) {
             { name: 'query', value: searchQuery },
             { name: 'communityTag', value: communityTag },
             { name: 'startDate', value: startDate.toISOString() },
-            { name: 'limit', value: limit },
+            { name: 'limit', value: limit + 1 },
             { name: 'offset', value: offset }
         ]);
         
-        snaps = await dealiasSoftPosts(snapRows as any);
-
-        const { rows: snapCountRows } = await db.executeQuery(`
-            SELECT COUNT(*) as total
-            FROM comments c
-            WHERE (c.body ILIKE @query OR c.title ILIKE @query)
-              AND (c.parent_permlink SIMILAR TO 'snap-container-%' OR c.parent_permlink = 'nxvsjarvmp')
-              AND c.json_metadata @> @communityTag::jsonb
-              AND c.deleted = false
-              AND c.created >= @startDate
-        `, [
-            { name: 'query', value: searchQuery },
-            { name: 'communityTag', value: communityTag },
-            { name: 'startDate', value: startDate.toISOString() }
-        ]);
-        totalSnaps = parseInt(snapCountRows[0].total);
+        hasMoreSnaps = snapRows.length > limit;
+        const currentSnaps = snapRows.slice(0, limit);
+        snaps = await dealiasSoftPosts(currentSnaps as any);
     }
 
-    // Calculate pagination metadata based on the larger set if type=all
-    const total = type === 'users' ? totalUsers : (type === 'snaps' ? totalSnaps : Math.max(totalUsers, totalSnaps));
-    const totalPages = Math.ceil(total / limit);
+    const hasNextPage = type === 'users' ? hasMoreUsers : (type === 'snaps' ? hasMoreSnaps : (hasMoreUsers || hasMoreSnaps));
 
     return NextResponse.json({
       success: true,
@@ -137,11 +116,9 @@ export async function GET(request: NextRequest) {
         snaps: snaps.length > 0 ? snaps : undefined
       },
       pagination: {
-        total,
-        totalPages,
         currentPage: page,
         limit,
-        hasNextPage: page < totalPages,
+        hasNextPage,
         hasPrevPage: page > 1
       }
     }, {

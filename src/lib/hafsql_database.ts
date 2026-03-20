@@ -28,6 +28,7 @@ function initializePool(): Pool {
       max: 5, // Per admin's recommendation
       idleTimeoutMillis: 300000, // 5 minutes
       connectionTimeoutMillis: 30000, // 30 seconds
+      statement_timeout: 15000, // 15 seconds per query
     };
 
     if (!config.user || !config.password || !config.host || !config.database) {
