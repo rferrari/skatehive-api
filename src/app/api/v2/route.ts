@@ -17,6 +17,7 @@ export async function GET() {
                 balance:        "/api/v2/balance",
                 rewards:        "/api/v2/balance/[username]/rewards",
                 vote:           "/api/v2/vote",
+                search:         "/api/v2/search",
             }
         },
         { status: 200 }
