@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { HAFSQL_Database } from '@/lib/hafsql_database';
 import { dealiasSoftPosts } from '@/lib/soft-posts';
+import { normalizePost } from '../../helpers';
 
 const db = new HAFSQL_Database();
 
@@ -33,7 +34,7 @@ export async function GET(
         WHERE f.follower_name = @username
             AND cs.community_name = 'hive-173115'
             AND c.parent_author = 'peak.snaps'
-            AND c.parent_permlink SIMILAR TO 'snap-container-%'
+            AND c.parent_permlink LIKE 'snap-container-%'
             AND c.json_metadata @> '{"tags": ["hive-173115"]}'
             AND c.deleted = false;`,
         [{ name: 'username', value: username }]
@@ -103,7 +104,7 @@ export async function GET(
         WHERE f.follower_name = @username
         AND cs.community_name = 'hive-173115'
         AND c.parent_author = 'peak.snaps'
-        AND c.parent_permlink SIMILAR TO 'snap-container-%'
+        AND c.parent_permlink LIKE 'snap-container-%'
         AND c.json_metadata @> '{"tags": ["hive-173115"]}'
         AND c.deleted = false
         GROUP BY 
@@ -146,7 +147,8 @@ export async function GET(
         OFFSET ${offset};
     `, [{ name: 'username', value: username }]);
 
-        const dealiasedRows = await dealiasSoftPosts(rows as any);
+        const normalizedRows = rows.map((row: any) => normalizePost(row, 'haf'));
+        const dealiasedRows = await dealiasSoftPosts(normalizedRows);
 
         // Calculate pagination metadata
         const totalPages = Math.ceil(total / limit);
@@ -172,7 +174,7 @@ export async function GET(
             {
                 status: 200,
                 headers: {
-                    'Cache-Control': 's-maxage=300, stale-while-revalidate=150'
+                    'Cache-Control': 'no-store, max-age=0'
                 }
             }
         );
