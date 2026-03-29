@@ -3,6 +3,7 @@
 */
 import { NextRequest, NextResponse } from 'next/server';
 import { HAFSQL_Database } from '@/lib/hafsql_database';
+import { dealiasSoftPosts } from '@/lib/soft-posts';
 
 const db = new HAFSQL_Database();
 
@@ -31,6 +32,7 @@ export async function GET(
         JOIN community_subs cs ON f.following_name = cs.account_name 
         WHERE f.follower_name = @username
             AND cs.community_name = 'hive-173115'
+            AND c.parent_author = 'peak.snaps'
             AND c.parent_permlink SIMILAR TO 'snap-container-%'
             AND c.json_metadata @> '{"tags": ["hive-173115"]}'
             AND c.deleted = false;`,
@@ -100,6 +102,7 @@ export async function GET(
             AND c.permlink = v.permlink
         WHERE f.follower_name = @username
         AND cs.community_name = 'hive-173115'
+        AND c.parent_author = 'peak.snaps'
         AND c.parent_permlink SIMILAR TO 'snap-container-%'
         AND c.json_metadata @> '{"tags": ["hive-173115"]}'
         AND c.deleted = false
@@ -143,6 +146,8 @@ export async function GET(
         OFFSET ${offset};
     `, [{ name: 'username', value: username }]);
 
+        const dealiasedRows = await dealiasSoftPosts(rows as any);
+
         // Calculate pagination metadata
         const totalPages = Math.ceil(total / limit);
         const hasNextPage = page < totalPages;
@@ -151,7 +156,7 @@ export async function GET(
         return NextResponse.json(
             {
                 success: true,
-                data: rows,
+                data: dealiasedRows,
                 headers: headers,
                 pagination: {
                     total,

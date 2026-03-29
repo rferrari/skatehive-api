@@ -3,6 +3,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { HAFSQL_Database } from '@/lib/hafsql_database';
+import { dealiasSoftPosts } from '@/lib/soft-posts';
 
 const db = new HAFSQL_Database();
 
@@ -22,7 +23,8 @@ export async function GET(request: NextRequest) {
     const {rows: totalRows} = await db.executeQuery(`
       SELECT COUNT(*) as total
       FROM comments
-      WHERE parent_permlink SIMILAR TO 'snap-container-%'
+      WHERE parent_author = 'peak.snaps'
+      AND parent_permlink SIMILAR TO 'snap-container-%'
       AND json_metadata @> '{"tags": ["hive-173115"]}'
     `);
 
@@ -85,7 +87,8 @@ export async function GET(request: NextRequest) {
       LEFT JOIN operation_effective_comment_vote_view v 
         ON c.author = v.author 
         AND c.permlink = v.permlink
-      WHERE c.parent_permlink SIMILAR TO 'snap-container-%'
+      WHERE c.parent_author = 'peak.snaps'
+      AND c.parent_permlink SIMILAR TO 'snap-container-%'
       AND c.json_metadata @> '{"tags": ["hive-173115"]}'
       AND c.deleted = false
       GROUP BY 
@@ -129,6 +132,8 @@ export async function GET(request: NextRequest) {
       OFFSET ${offset};
     `);
 
+    const dealiasedRows = await dealiasSoftPosts(rows as any);
+
     // Calculate pagination metadata
     const totalPages = Math.ceil(total / limit);
     const hasNextPage = page < totalPages;
@@ -137,7 +142,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        data: rows,
+        data: dealiasedRows,
         headers: headers,
         pagination: {
           total,
