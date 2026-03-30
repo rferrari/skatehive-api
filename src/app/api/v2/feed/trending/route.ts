@@ -19,19 +19,11 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, Number(searchParams.get('page')) || Number(DEFAULT_PAGE));
     const limit = Math.max(1, Number(searchParams.get('limit')) || Number(DEFAULT_FEED_LIMIT));
     const offset = (page - 1) * limit;
+    const COMMUNITY = searchParams.get('community_code') || process.env.MY_COMMUNITY_CATEGORY || 'hive-173115';
+    const tagFilter = `{"tags": ["${COMMUNITY}"]}`;
 
-    // Get total count for pagination
-    const {rows: totalRows} = await db.executeQuery(`
-      SELECT COUNT(*) as total
-      FROM comments
-      WHERE parent_author = 'peak.snaps'
-      AND parent_permlink LIKE 'snap-container-%'
-      AND json_metadata @> '{"tags": ["hive-173115"]}'
-    `);
-
-    const total = parseInt(totalRows[0].total);
-
-    // Get paginated data
+    // Step 2: Get paginated data (skip total count for performance)
+    const fetchLimit = limit + 1;
     const {rows, headers} = await db.executeQuery(`
       SELECT 
         c.body, 
@@ -90,7 +82,7 @@ export async function GET(request: NextRequest) {
         AND c.permlink = v.permlink
       WHERE c.parent_author = 'peak.snaps'
       AND c.parent_permlink LIKE 'snap-container-%'
-      AND c.json_metadata @> '{"tags": ["hive-173115"]}'
+      AND c.json_metadata @> @tag_filter
       AND c.deleted = false
       GROUP BY 
         c.id, 
@@ -129,17 +121,16 @@ export async function GET(request: NextRequest) {
         a.followers, 
         a.followings
       ORDER BY c.pending_payout_value DESC
-      LIMIT ${limit}
+      LIMIT ${fetchLimit}
       OFFSET ${offset};
-    `);
+    `, [{ name: 'tag_filter', value: tagFilter }]);
 
-    const normalizedRows = rows.map((row: any) => normalizePost(row, 'haf'));
+    // Pagination trick: if we got more rows than limit, there is a next page
+    const hasNextPage = rows.length > limit;
+    const actualRows = hasNextPage ? rows.slice(0, limit) : rows;
+
+    const normalizedRows = actualRows.map((row: any) => normalizePost(row, 'haf'));
     const dealiasedRows = await dealiasSoftPosts(normalizedRows);
-
-    // Calculate pagination metadata
-    const totalPages = Math.ceil(total / limit);
-    const hasNextPage = page < totalPages;
-    const hasPrevPage = page > 1;
 
     return NextResponse.json(
       {
@@ -147,14 +138,14 @@ export async function GET(request: NextRequest) {
         data: dealiasedRows,
         headers: headers,
         pagination: {
-          total,
-          totalPages,
+          total: null, // Omitted for performance
+          totalPages: null,
           currentPage: page,
           limit,
           hasNextPage,
-          hasPrevPage,
+          hasPrevPage: page > 1,
           nextPage: hasNextPage ? page + 1 : null,
-          prevPage: hasPrevPage ? page - 1 : null
+          prevPage: page > 1 ? page - 1 : null
         }
       },
       {
